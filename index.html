@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Astronomical Time — Hologram Test</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #02050a; color: #e8f2fa; }
+    #scene { position: fixed; inset: 0; }
+    canvas { display: block; width: 100%; height: 100%; }
+    .panel {
+      position: fixed; z-index: 2; top: 16px; left: 16px; width: min(300px, calc(100vw - 32px));
+      padding: 14px; border: 1px solid rgba(150,190,220,.22); border-radius: 12px;
+      background: rgba(3,10,18,.82); backdrop-filter: blur(10px);
+    }
+    h1 { margin: 0 0 5px; font-size: 14px; letter-spacing: .14em; font-weight: 650; }
+    .sub { margin: 0 0 13px; color: #9fb2c4; font-size: 11px; line-height: 1.5; }
+    .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    button {
+      min-height: 36px; padding: 8px 10px; border: 1px solid rgba(150,190,220,.3);
+      border-radius: 7px; color: #e8f2fa; background: rgba(30,50,68,.65); cursor: pointer;
+      font-size: 12px;
+    }
+    button.active { border-color: #58c8ef; background: rgba(28,112,145,.35); }
+    button:focus-visible { outline: 2px solid #ffc30e; outline-offset: 2px; }
+    .status { margin-top: 11px; color: #9fb2c4; font-size: 11px; }
+    .hint { position: fixed; z-index: 2; right: 16px; bottom: 14px; color: #91a5b8; font-size: 11px; text-align: right; }
+    @media (max-width: 520px) {
+      .panel { top: 10px; left: 10px; padding: 11px; width: 245px; }
+      .hint { right: 10px; bottom: 10px; max-width: 150px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="scene"></div>
+  <section class="panel">
+    <h1>HOLOGRAM TEST</h1>
+    <p class="sub">Isolated Three.js test. Original sphere materials remain underneath the holographic overlays.</p>
+    <div class="controls">
+      <button id="orbit" class="active">Orbit View</button>
+      <button id="earthFocus">Earth Focus</button>
+      <button id="sunFocus">Sun Focus</button>
+      <button id="toggle">Hologram: On</button>
+    </div>
+    <div class="status" id="status">Orbit View · hologram enabled</div>
+  </section>
+  <div class="hint">Drag to rotate · Scroll to zoom</div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
