@@ -88,12 +88,38 @@ function parseVOTable(xml) {
   );
 
   if (!tableData) {
-    throw new Error(
-      "VOTable does not contain TABLEDATA. " +
-      "The HEASARC response may be using a different serialization format."
-    );
-  }
+  const dataSection = xml.match(
+    /<DATA\b[\s\S]*?<\/DATA>/i
+  );
 
+  console.error("\n========== VOTABLE FORMAT DIAGNOSTIC ==========");
+
+  console.error(
+    "DATA section preview:",
+    dataSection
+      ? dataSection[0].slice(0, 3000)
+      : "No DATA section found"
+  );
+
+  console.error(
+    "Response beginning:",
+    xml.slice(0, 1500)
+  );
+
+  console.error(
+    "Serialization detected:",
+    ["TABLEDATA", "BINARY2", "BINARY", "FITS"]
+      .filter(format =>
+        new RegExp(`<${format}\\b`, "i").test(xml)
+      )
+      .join(", ") || "Unknown"
+  );
+
+  throw new Error(
+    "Unsupported VOTable serialization. " +
+    "See diagnostic output above."
+  );
+  }
   const records = [];
 
   for (const rowMatch of tableData[1].matchAll(
