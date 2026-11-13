@@ -1,0 +1,41 @@
+
+name: NuSTAR NUMASTER Discovery Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_records:
+        description: "Maximum NUMASTER rows to request"
+        required: false
+        default: "50000"
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout test repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Query NUMASTER and generate reports
+        env:
+          NUSTAR_MAX_RECORDS: ${{ inputs.max_records }}
+        run: node scripts/test-nustar-numaster.js
+
+      - name: Upload NUMASTER diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nustar-numaster-discovery-${{ github.run_number }}
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 14
