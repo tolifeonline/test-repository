@@ -29,7 +29,7 @@ jobs:
       - name: Query NUMASTER and generate reports
         env:
           NUSTAR_MAX_RECORDS: ${{ inputs.max_records }}
-        run: node scripts/test-nustar-numaster.js
+        run: node scripts/test-nustar-numaster2.js
 
       - name: Upload NUMASTER diagnostic reports
         if: always()
