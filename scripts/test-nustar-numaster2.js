@@ -356,8 +356,6 @@ const params = new URLSearchParams({
 
 const rawRecords = parseVOTable(responseText);
 
-  const rawRecords = parseCsv(responseText);
-
   const records = rawRecords.map(normalizeRecord);
 
   const publiclyAvailable = records.filter(
