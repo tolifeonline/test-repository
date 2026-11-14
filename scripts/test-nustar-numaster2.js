@@ -124,35 +124,290 @@ function parseVOTable(xml) {
 
   for (const rowMatch of tableData[1].matchAll(
     /<TR\b[^>]*>([\s\S]*?)<\/TR>/gi
+function parseVOTable(xml) {
+  const queryError = xml.match(
+    /<INFO\b[^>]*name=["']QUERY_STATUS["'][^>]*value=["']ERROR["'][^>]*>([\s\S]*?)<\/INFO>/i
+  );
+
+  if (queryError) {
+    throw new Error(
+      `HEASARC TAP query error: ${decodeXml(
+        queryError[1].replace(/<[^>]*>/g, "").trim()
+      )}`
+    );
+  }
+
+  const tableMatch = xml.match(
+    /<TABLE\b[\s\S]*?<\/TABLE>/i
+  );
+
+  if (!tableMatch) {
+    throw new Error("VOTable contains no TABLE definition.");
+  }
+
+  const fields = [];
+
+  for (const match of tableMatch[0].matchAll(
+    /<FIELD\b([^>]*)\/?>/gi
   )) {
-    const values = [];
+    const attributes = parseXmlAttributes(match[1]);
 
-    for (const cellMatch of rowMatch[1].matchAll(
-      /<TD\b[^>]*>([\s\S]*?)<\/TD>/gi
-    )) {
-      const value = decodeXml(
-        cellMatch[1]
-          .replace(/<[^>]*>/g, "")
-          .trim()
+    fields.push({
+      name:
+        attributes.name ||
+        attributes.id ||
+        `column_${fields.length + 1}`,
+
+      datatype: (attributes.datatype || "char").toLowerCase(),
+      arraysize: attributes.arraysize || "",
+      nullValue: null
+    });
+  }
+
+  if (!fields.length) {
+    throw new Error("VOTable contains no FIELD definitions.");
+  }
+
+  const valuesMatch = tableMatch[0].match(
+    /<VALUES\b([^>]*)\/?>/i
+  );
+
+  // Null metadata is optional and may be associated with individual fields.
+  // We handle the main binary serialization independently of it.
+
+  const streamMatch = xml.match(
+    /<STREAM\b([^>]*)>([\s\S]*?)<\/STREAM>/i
+  );
+
+  if (!streamMatch) {
+    throw new Error("VOTable contains no STREAM element.");
+  }
+
+  const streamAttributes = parseXmlAttributes(streamMatch[1]);
+
+  if (
+    streamAttributes.encoding &&
+    streamAttributes.encoding.toLowerCase() !== "base64"
+  ) {
+    throw new Error(
+      `Unsupported STREAM encoding: ${streamAttributes.encoding}`
+    );
+  }
+
+  const base64 = streamMatch[2].replace(/\s+/g, "");
+  const buffer = Buffer.from(base64, "base64");
+
+  let offset = 0;
+
+  function readBytes(length) {
+    if (
+      !Number.isSafeInteger(length) ||
+      length < 0 ||
+      offset + length > buffer.length
+    ) {
+      throw new Error(
+        `Invalid binary field length at byte ${offset}. ` +
+        `Requested ${length} bytes; stream contains ${buffer.length}.`
       );
-
-      values.push(value);
     }
 
+    const result = buffer.subarray(offset, offset + length);
+    offset += length;
+
+    return result;
+  }
+
+  function readNumber(datatype) {
+    const sizes = {
+      boolean: 1,
+      bit: 1,
+      unsignedbyte: 1,
+      short: 2,
+      int: 4,
+      long: 8,
+      float: 4,
+      double: 8
+    };
+
+    const size = sizes[datatype];
+
+    if (!size) {
+      throw new Error(`Unsupported numeric datatype: ${datatype}`);
+    }
+
+    const bytes = readBytes(size);
+
+    switch (datatype) {
+      case "boolean":
+      case "bit": {
+        const value = bytes[0];
+
+        if (value === 84 || value === 49) return true;
+        if (value === 70 || value === 48) return false;
+
+        return null;
+      }
+
+      case "unsignedbyte":
+        return bytes.readUInt8(0);
+
+      case "short":
+        return bytes.readInt16BE(0);
+
+      case "int":
+        return bytes.readInt32BE(0);
+
+      case "long": {
+        const value = bytes.readBigInt64BE(0);
+
+        return Number.isSafeInteger(Number(value))
+          ? Number(value)
+          : value.toString();
+      }
+
+      case "float":
+        return bytes.readFloatBE(0);
+
+      case "double":
+        return bytes.readDoubleBE(0);
+    }
+  }
+
+  function parseArraySize(arraysize) {
+    if (!arraysize) return 1;
+
+    const dimensions = arraysize.split("x");
+    let count = 1;
+
+    for (const dimension of dimensions) {
+      if (dimension === "*") {
+        return null;
+      }
+
+      const number = Number(dimension);
+
+      if (!Number.isInteger(number) || number < 1) {
+        throw new Error(`Invalid VOTable arraysize: ${arraysize}`);
+      }
+
+      count *= number;
+    }
+
+    return count;
+  }
+
+  function readField(field) {
+    const datatype = field.datatype;
+    const variable = field.arraysize.includes("*");
+
+    let count = parseArraySize(field.arraysize);
+
+    // Variable-length arrays start with a 4-byte big-endian
+    // integer containing the number of elements.
+    if (variable) {
+      const lengthBytes = readBytes(4);
+      count = lengthBytes.readInt32BE(0);
+
+      if (count < 0 || count > 10000000) {
+        throw new Error(
+          `Invalid variable array length for ${field.name}: ${count}`
+        );
+      }
+    }
+
+    if (
+      datatype === "char" ||
+      datatype === "unicodechar"
+    ) {
+      const bytesPerCharacter =
+        datatype === "unicodechar" ? 2 : 1;
+
+      const bytes = readBytes(count * bytesPerCharacter);
+
+      let value;
+
+      if (datatype === "unicodechar") {
+        value = bytes.toString("utf16be");
+      } else {
+        value = bytes.toString("utf8");
+      }
+
+      return value.replace(/\0+$/g, "");
+    }
+
+    const complex =
+      datatype === "floatcomplex" ||
+      datatype === "doublecomplex";
+
+    if (complex) {
+      const values = [];
+
+      for (let i = 0; i < count; i++) {
+        const componentType =
+          datatype === "floatcomplex" ? "float" : "double";
+
+        values.push([
+          readNumber(componentType),
+          readNumber(componentType)
+        ]);
+      }
+
+      return count === 1 ? values[0] : values;
+    }
+
+    if (
+      datatype === "boolean" ||
+      datatype === "bit" ||
+      datatype === "unsignedbyte" ||
+      datatype === "short" ||
+      datatype === "int" ||
+      datatype === "long" ||
+      datatype === "float" ||
+      datatype === "double"
+    ) {
+      const values = [];
+
+      for (let i = 0; i < count; i++) {
+        values.push(readNumber(datatype));
+      }
+
+      return count === 1 ? values[0] : values;
+    }
+
+    throw new Error(
+      `Unsupported VOTable datatype "${datatype}" in field "${field.name}".`
+    );
+  }
+
+  const records = [];
+
+  while (offset < buffer.length) {
+    const rowStart = offset;
     const record = {};
 
-    fields.forEach((field, index) => {
-      record[field] = values[index] ?? "";
-    });
+    try {
+      for (const field of fields) {
+        record[field.name] = readField(field);
+      }
+    } catch (error) {
+      throw new Error(
+        `Failed decoding NUMASTER record ${records.length + 1}, ` +
+        `starting at byte ${rowStart}: ${error.message}`
+      );
+    }
 
     records.push(record);
   }
 
   if (!records.length) {
-    throw new Error(
-      "VOTable was valid but contained no TABLEDATA records."
-    );
+    throw new Error("VOTable binary stream contains no records.");
   }
+
+  console.log("\n========== BINARY DECODE SUMMARY ==========");
+  console.log("Fields:", fields.length);
+  console.log("Decoded records:", records.length);
+  console.log("Bytes consumed:", offset);
+  console.log("Bytes available:", buffer.length);
 
   return records;
 }
