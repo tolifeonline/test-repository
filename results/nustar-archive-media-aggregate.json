@@ -1,0 +1,122 @@
+{
+  "generatedAtUtc": "2026-11-14T05:49:54.672Z",
+  "startedAtUtc": "2026-11-14T05:47:26.169Z",
+  "sourceCsv": "results/numaster-product-candidates.csv",
+  "maxRequested": 500,
+  "uniqueCandidatesAvailable": 5859,
+  "observationsTested": 500,
+  "concurrency": 4,
+  "requestTimeoutMs": 25000,
+  "archive": {
+    "accessible": 500,
+    "inaccessible": 0,
+    "accessibilityRate": 1
+  },
+  "media": {
+    "observationsWithValidatedMedia": 498,
+    "observationsWithoutValidatedMedia": 2,
+    "mediaAvailabilityRate": 0.996,
+    "totalValidatedMediaFiles": 2974,
+    "categoryCounts": {
+      "image": 996,
+      "light_curve": 987,
+      "spectrum": 991,
+      "FPMA": 1486,
+      "FPMB": 1488,
+      "other_image": 0,
+      "unknown": 0
+    }
+  },
+  "statusComparison": {
+    "processed": {
+      "total": 3,
+      "with_media": 3,
+      "with_archive": 3
+    },
+    "archived": {
+      "total": 497,
+      "with_media": 495,
+      "with_archive": 497
+    }
+  },
+  "observationTypeComparison": {
+    "CAL": {
+      "total": 38,
+      "with_media": 37,
+      "with_archive": 38
+    },
+    "TOO": {
+      "total": 152,
+      "with_media": 152,
+      "with_archive": 152
+    },
+    "EGS": {
+      "total": 26,
+      "with_media": 26,
+      "with_archive": 26
+    },
+    "N12": {
+      "total": 5,
+      "with_media": 5,
+      "with_archive": 5
+    },
+    "N11": {
+      "total": 209,
+      "with_media": 208,
+      "with_archive": 209
+    },
+    "P03": {
+      "total": 7,
+      "with_media": 7,
+      "with_archive": 7
+    },
+    "N10": {
+      "total": 43,
+      "with_media": 43,
+      "with_archive": 43
+    },
+    "P02": {
+      "total": 9,
+      "with_media": 9,
+      "with_archive": 9
+    },
+    "X24": {
+      "total": 6,
+      "with_media": 6,
+      "with_archive": 6
+    },
+    "C26": {
+      "total": 3,
+      "with_media": 3,
+      "with_archive": 3
+    },
+    "N05": {
+      "total": 2,
+      "with_media": 2,
+      "with_archive": 2
+    }
+  },
+  "statusCounts": {
+    "archived": 497,
+    "processed": 3
+  },
+  "observationTypeCounts": {
+    "N11": 209,
+    "TOO": 152,
+    "N10": 43,
+    "CAL": 38,
+    "EGS": 26,
+    "P02": 9,
+    "P03": 7,
+    "X24": 6,
+    "N12": 5,
+    "C26": 3,
+    "N05": 2
+  },
+  "notes": [
+    "A directory returning HTTP 200 is not proof that usable media exists.",
+    "Only files with a verified image signature (GIF/PNG/JPEG/WebP) count as media.",
+    "FITS and large science products were never downloaded.",
+    "All candidate statuses (processed, archived, issue-flagged) were retained."
+  ]
+}
