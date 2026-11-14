@@ -327,7 +327,7 @@ function parseVOTable(xml) {
       let value;
 
       if (datatype === "unicodechar") {
-        value = bytes.toString("utf16be");
+        value = Buffer.from(bytes).swap16().toString("utf16le");
       } else {
         value = bytes.toString("utf8");
       }
