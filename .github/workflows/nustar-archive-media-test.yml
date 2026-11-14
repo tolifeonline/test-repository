@@ -1,0 +1,59 @@
+name: NuSTAR Latest 1000 Archive Media Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_obs:
+        description: "Maximum unique ObsIDs to test (default 1000)"
+        required: false
+        default: "1000"
+      concurrency:
+        description: "Request concurrency (3–5 recommended)"
+        required: false
+        default: "4"
+
+permissions:
+  contents: read
+
+jobs:
+  archive-media-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Checkout test repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Verify candidates CSV exists
+        run: |
+          if [ ! -f results/numaster-product-candidates.csv ]; then
+            echo "ERROR: results/numaster-product-candidates.csv not found."
+            echo "Run the NUMASTER discovery workflow first."
+            exit 1
+          fi
+          echo "Candidates CSV present:"
+          wc -l results/numaster-product-candidates.csv
+          head -n 2 results/numaster-product-candidates.csv
+
+      - name: Run archive media availability test
+        env:
+          NUSTAR_CANDIDATES_CSV: results/numaster-product-candidates.csv
+          NUSTAR_OUTPUT_DIR: results/nustar-archive-test
+          NUSTAR_MAX_OBS: ${{ inputs.max_obs }}
+          NUSTAR_CONCURRENCY: ${{ inputs.concurrency }}
+          NUSTAR_TIMEOUT_MS: "25000"
+        run: node scripts/test-nustar-archive-media.js
+
+      - name: Upload archive media test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nustar-archive-media-test-${{ github.run_number }}
+          path: results/nustar-archive-test/
+          if-no-files-found: warn
+          retention-days: 14
