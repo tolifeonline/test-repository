@@ -2379,6 +2379,7 @@ if (window.EarthLocator) {
 			document.getElementById('mode4LocationHUD').style.display = 'none';
 			hideSolarViewSelector();
 			hideTapIndicator();
+			mode4Hologram.setEnabled(false);
 		},
 		onExitSpacecraftInspection: () => {
 			focusEarth();
