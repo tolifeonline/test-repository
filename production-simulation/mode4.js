@@ -6,7 +6,8 @@
 
 import * as THREE from
     'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
-	
+
+import { createHologram } from '../hologram.js';
 	
 let mode4Running = true;
 
@@ -1089,7 +1090,17 @@ solarSystem.add(
     earth
 );
 
+/* ------------------------------------------
+   Mode 4 — Holographic overlay
+   ------------------------------------------ */
 
+const mode4Hologram = createHologram(THREE);
+
+mode4Hologram.attachEarth(earth);
+mode4Hologram.attachSun(sun);
+
+// Initial view is Orbit View.
+mode4Hologram.setEnabled(true);
 
 const uv = earthGeometry.attributes.uv;
 const position = earthGeometry.attributes.position;
@@ -1298,6 +1309,7 @@ earthCameraControls.style.display = 'none';
    ------------------------------------------ */
 
 function focusEarth() {
+	mode4Hologram.setEnabled(false);
     earthFocused = true;
 	sunFocused = false;
     cameraTransition = true;
@@ -1341,6 +1353,7 @@ function focusEarth() {
 function focusSun() {
     earthFocused = false;
     sunFocused = true;
+	mode4Hologram.setEnabled(false);
 
     const sunPosition = sun.getWorldPosition(
         new THREE.Vector3()
@@ -1375,6 +1388,7 @@ function focusSun() {
 
 
 function returnToOrbit() {
+	mode4Hologram.setEnabled(true);
     earthFocused = false;
 	sunFocused = false;
     cameraTransition = true;
