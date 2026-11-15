@@ -502,61 +502,147 @@ function makeEarthOceanSurface(THREE, radius) {
 
 
 
+
 function makeMagneticLoops(radius, color, opacity) {
     const group = new THREE.Group();
+    group.name = 'sunHologramMagneticField';
 
-    const loopConfigs = [
-        { longitude: 0, height: 1.65, width: 0.72 },
-        { longitude: Math.PI / 3, height: 1.45, width: 0.62 },
-        { longitude: (2 * Math.PI) / 3, height: 1.55, width: 0.68 },
-        { longitude: Math.PI, height: 1.65, width: 0.72 },
-        { longitude: (4 * Math.PI) / 3, height: 1.45, width: 0.62 },
-        { longitude: (5 * Math.PI) / 3, height: 1.55, width: 0.68 }
-    ];
+    // Randomized magnetic bundle configuration.
+    const bundleCount = 18;
+    const strandsPerBundle = 7;
+    const segments = 96;
 
-    const baseRadius = radius * 1.025;
+    const positions = [];
 
-    for (const config of loopConfigs) {
-        const points = [];
-        const segments = 96;
+    for (let b = 0; b < bundleCount; b++) {
 
-        const halfWidth = radius * config.width;
-        const height = radius * config.height;
+        // Uniformly distribute bundle origins over the sphere.
+        const z = Math.random() * 2 - 1;
+        const angle = Math.random() * Math.PI * 2;
+        const radial = Math.sqrt(1 - z * z);
 
-        for (let i = 0; i <= segments; i++) {
-            const t = Math.PI * i / segments;
+        const normal = new THREE.Vector3(
+            radial * Math.cos(angle),
+            z,
+            radial * Math.sin(angle)
+        );
 
-            // Elliptical arch extending outward from the Sun.
-            const horizontal = halfWidth * Math.cos(t);
-            const vertical = height * Math.sin(t);
+        // Establish a random orientation for each bundle.
+        const randomVector = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+        );
 
-            // Rotate each arch around the Sun's vertical axis.
-            const x = horizontal * Math.cos(config.longitude);
-            const z = horizontal * Math.sin(config.longitude);
-            const y = vertical;
+        const tangent = new THREE.Vector3()
+            .crossVectors(normal, randomVector);
 
-            points.push(new THREE.Vector3(x, y, z));
+        // Protect against a nearly parallel random vector.
+        if (tangent.lengthSq() < 0.0001) {
+            tangent.set(1, 0, 0)
+                .cross(normal);
         }
 
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        tangent.normalize();
 
-        const material = new THREE.LineBasicMaterial({
-            color,
-            transparent: true,
-            opacity,
-            depthWrite: false,
-            toneMapped: false
-        });
+        const bundleAxis = new THREE.Vector3()
+            .crossVectors(normal, tangent)
+            .normalize();
 
-        const line = new THREE.Line(geometry, material);
-        line.renderOrder = 6;
-        line.raycast = () => {};
+        // Smaller randomized loops.
+        const baseSpan = 0.10 + Math.random() * 0.14;
+        const baseHeight = radius * (
+            0.15 + Math.random() * 0.25
+        );
 
-        group.add(line);
+        // Fine, closely spaced filaments.
+        const strandSpacing =
+            0.006 + Math.random() * 0.004;
+
+        for (let s = 0; s < strandsPerBundle; s++) {
+
+            const strandOffset =
+                (s - (strandsPerBundle - 1) / 2) *
+                strandSpacing;
+
+            const strandNormal = normal.clone()
+                .addScaledVector(bundleAxis, strandOffset)
+                .normalize();
+
+            // Slight natural variation within each bundle.
+            const span = baseSpan +
+                (Math.random() - 0.5) * 0.015;
+
+            const height = baseHeight *
+                (0.94 + Math.random() * 0.12);
+
+            const points = [];
+
+            for (let i = 0; i <= segments; i++) {
+
+                const t = Math.PI * i / segments;
+
+                // Compact magnetic arch.
+                // Both endpoints remain on the solar surface.
+                const horizontal =
+                    radius * Math.sin(span) * Math.cos(t);
+
+                const vertical =
+                    radius * Math.cos(span) +
+                    height * Math.sin(t);
+
+                const point = strandNormal.clone()
+                    .multiplyScalar(vertical)
+                    .addScaledVector(tangent, horizontal);
+
+                points.push(point);
+            }
+
+            // Add the fine filament as line segments.
+            for (let i = 0; i < points.length - 1; i++) {
+                positions.push(
+                    points[i].x,
+                    points[i].y,
+                    points[i].z,
+
+                    points[i + 1].x,
+                    points[i + 1].y,
+                    points[i + 1].z
+                );
+            }
+        }
     }
+
+    // One shared geometry for all magnetic filaments.
+    const geometry = new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+        'position',
+        new THREE.Float32BufferAttribute(positions, 3)
+    );
+
+    const material = new THREE.LineBasicMaterial({
+        color,
+        transparent: true,
+        opacity: opacity * 0.72,
+        depthWrite: false,
+        toneMapped: false
+    });
+
+    const magneticLines = new THREE.LineSegments(
+        geometry,
+        material
+    );
+
+    magneticLines.name = 'sunHologramMagneticFilaments';
+    magneticLines.renderOrder = 6;
+    magneticLines.raycast = () => {};
+
+    group.add(magneticLines);
 
     return group;
 }
+
 
 
 function makeSolarGranularSurface(THREE, radius) {
