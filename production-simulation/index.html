@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Astronomical Time</title>
+<link
+    rel="icon"
+    type="image/svg+xml"
+    href="icon.svg"
+>
+
+<link
+    rel="apple-touch-icon"
+    href="icon.svg"
+>
+
+<link
+    rel="manifest"
+    href="manifest.json"
+>
+<link
+    rel="preconnect"
+    href="https://fonts.googleapis.com"
+>
+
+<link
+    rel="preconnect"
+    href="https://fonts.gstatic.com"
+    crossorigin
+>
+
+<link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet"
+>
+<link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+<div id="mode1Content">
+<main>
+
+    <!-- ============================= -->
+    <!-- TOP INFORMATION -->
+    <!-- ============================= -->
+
+    <header id="topInfo" class="info collapsed">
+
+        <div class="info-summary">
+            <small>ASTRONOMICAL TIME</small>
+
+            <h1>EOC</h1>
+
+            <div id="status">Loading…</div>
+        </div>
+
+        <div class="info-details">
+
+            <p>
+                Earth's position in its journey around the Sun.
+            </p>
+
+            <p>
+                The clock provides an astronomical perspective
+                of the yearly cycle based on Earth's position
+                in its orbit.
+            </p>
+
+        </div>
+
+    </header>
+
+
+    <!-- ============================= -->
+    <!-- MAIN CLOCK -->
+    <!-- ============================= -->
+
+    <section class="clock-area" id="clockArea">
+
+        <div
+            class="orbit"
+            id="orbit"
+            aria-label="Earth orbital clock"
+            role="button"
+            tabindex="0"
+        >
+
+            <i class="trail"></i>
+
+            <i class="sun"></i>
+
+            <i class="earth" id="earth">
+                <b id="earthLabel">—</b>
+            </i>
+
+            <span class="marker m12">0°</span>
+            <span class="marker m3">90°</span>
+            <span class="marker m6">180°</span>
+            <span class="marker m9">270°</span>
+
+        </div>
+
+
+        <div id="value">—</div>
+
+        <label id="label">ORBITAL PROGRESS</label>
+
+        <p id="detail">—</p>
+
+
+        <nav>
+
+            <button data-mode="percent" class="on">
+                Percent
+            </button>
+
+            <button data-mode="days">
+                Days &amp; Minutes
+            </button>
+
+        </nav>
+
+    </section>
+
+	
+	<!-- =========================================
+		 COSMIC EVENT ALERTS — MODE 1
+		 ========================================= -->
+
+	<section id="cosmicAlerts" aria-label="Cosmic event alerts" hidden>
+
+		<!-- Latest qualified alert -->
+		<article id="cosmicFeatured" aria-live="polite">
+
+			<div class="cosmic-alert-heading">
+				<span id="cosmicAlertCategory" class="aiExplain">COSMIC EVENT</span>
+				<span id="cosmicAlertStatus" class="aiExplain"></span>
+			</div>
+
+			<h2 id="cosmicAlertTitle" >No active alerts</h2>
+
+			<p id="cosmicAlertDescription"></p>
+
+			<div class="cosmic-alert-footer">
+				<span id="cosmicAlertSource" class="aiExplain"></span>
+				<a
+					id="cosmicAlertLink"
+					href="#"
+					target="_blank"
+					rel="noopener noreferrer"
+					hidden
+				>View source ↗</a>
+			</div>
+
+		</article>
+
+		<!-- Other ongoing, unexpired alerts -->
+		<details id="cosmicAlertList" hidden>
+
+			<summary>
+				Other ongoing notifications
+				<span id="cosmicAlertCount">0</span>
+			</summary>
+
+			<div id="cosmicAlertItems"></div>
+
+		</details>
+
+	</section>
+
+
+    <!-- ============================= -->
+    <!-- BOTTOM INFORMATION -->
+    <!-- ============================= -->
+
+    <section id="bottomInfo" class="bottom-info collapsed">
+
+        <div class="bottom-summary">
+
+            <span>ABOUT <span style="color:white">E</span>arth <span style="color:white">O</span>rbital <span style="color:white">C</span>lock</span>
+
+            <span class="expand-symbol">+</span>
+
+        </div>
+
+
+        <div class="bottom-details">
+
+            <article>
+
+                <h2>INDEPENDENT EPHEMERIDES</h2>
+
+                <p>
+                    JPL Horizons / DE440
+                    <strong id="jpl">—</strong>
+                </p>
+
+                <p>
+                    IMCCE Miriade / INPOP
+                    <strong id="inpop">—</strong>
+                </p>
+
+                <p>
+                    Difference
+                    <strong id="difference">—</strong>
+                </p>
+
+            </article>
+
+
+            <article>
+
+                <h2>METHOD</h2>
+
+                <p>
+                    Earth's three-dimensional heliocentric
+                    position is compared with its position
+                    on January 1.
+                </p>
+
+                <p>
+                    The resulting orbital angle represents
+                    progress through the yearly orbital journey.
+                </p>
+
+            </article>
+
+
+            <article>
+
+                <h2>UNDERSTAND THE CLOCK</h2>
+
+                <p>
+                    January 1 begins at 12 o'clock.
+                    The orbital journey progresses around
+                    the visual clock.
+                </p>
+
+                <button
+                    id="openSynopsis"
+                    class="info-button"
+                    type="button"
+                >
+                    How it works
+                </button>
+
+            </article>
+
+        </div>
+
+    </section>
+
+
+    <!-- ============================= -->
+    <!-- FOOTER -->
+    <!-- ============================= -->
+
+    <footer>
+
+        <span id="updated" class="aiExplain"
+      data-ai-explain="ephemeris epoch" >—</span>
+
+        <span id="next">—</span>
+
+    </footer>
+
+
+</main>
+
+
+<!-- ========================================= -->
+<!-- SYNOPSIS OVERLAY -->
+<!-- ========================================= -->
+
+<div
+    id="synopsisOverlay"
+    class="overlay"
+    aria-hidden="true"
+>
+
+    <div class="overlay-panel">
+
+        <div class="overlay-header">
+
+            <div>
+                <small>ASTRONOMICAL TIME</small>
+
+                <h2>
+                    Understanding the Earth Orbital Clock(EOC)
+                </h2>
+            </div>
+
+            <button
+                id="closeSynopsis"
+                class="close-button"
+                type="button"
+                aria-label="Close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div
+            id="synopsisContent"
+            class="synopsis-content"
+        ></div>
+
+
+    </div>
+
+</div>
+
+</div>
+
+<!-- =========================================================
+     MODE 2
+     Phase 2
+     
+     This is the first implementation of the future
+     Mode 3 display engine.
+
+     Transparent background.
+     Draggable.
+     Resizable.
+     Uses the existing astronomical data from app.js.
+     ========================================================= -->
+
+<div
+    id="mode2Display"
+    aria-label="Astronomical Time visual">
+
+    <div id="mode2Visual">
+
+        <div id="mode2Orbit">
+
+            <div id="mode2Sun"></div>
+
+            <div id="mode2Earth">
+                <span>Earth</span>
+            </div>
+
+        </div>
+		
+		<div id="mode2Progress">
+    <span id="mode2ProgressValue">0.00%</span>
+	</div>
+
+    </div>
+	
+	<div id="mode2ResizeHandle"></div>
+	
+	
+</div>
+
+<!-- ==========================================
+     MODE 3
+     ========================================== -->
+
+<div id="mode3Display">
+	    <!-- User-customizable background/content layer -->
+    <div id="mode3Sandbox">
+
+        <iframe
+            id="mode3SandboxFrame"
+            sandbox="allow-scripts"
+            title="Mode 3 custom content">
+        </iframe>
+
+    </div>
+
+    
+
+    <div id="mode3Visual">
+	
+	<div id="mode3Header">EOC</div>
+
+        <div id="mode3Orbit">
+
+            <div id="mode3Sun"></div>
+
+            <div id="mode3Earth">
+                <span id="mode3EarthLabel">
+                    Earth
+                </span>
+            </div>
+
+        </div>
+
+        <div id="mode3Progress">
+            <span id="mode3ProgressValue">
+                —
+            </span>
+        </div>
+
+    </div>
+	
+	<button
+    id="mode3Fullscreen"
+    type="button"
+    aria-label="Enter fullscreen"
+    title="Fullscreen">
+    ⛶
+	</button>
+
+</div>
+
+<!-- ==========================================
+     MODE 4
+     ========================================== -->
+
+<div id="mode4Display">
+
+    <div id="mode4Scene">
+	<button id="mode4BackToOrbit" type="button">
+    ←
+	</button>
+	<div id="mode4SunInfo">
+    SUN <span>·</span> ATMOSPHERIC VIEW
+	</div>
+	<div id="mode4TapIndicator"></div>
+	</div>
+
+</div>
+
+<!-- =========================================================
+     DISPLAY MODE SELECTOR
+     Phase 1
+     ========================================================= -->
+
+<div id="modeSelector" aria-label="Display mode selector">
+
+    <button
+        type="button"
+        class="modeButton active"
+        data-mode="1"
+        aria-label="Mode 1">
+        <span class="icon-normal"></span>
+    </button>
+
+    <button
+        type="button"
+        class="modeButton"
+        data-mode="2"
+        aria-label="Mode 2">
+        <span class="icon-widget"></span>
+    </button>
+
+    <button
+        type="button"
+        class="modeButton"
+        data-mode="3"
+        aria-label="Mode 3">
+        <span class="icon-customized"></span>
+    </button>
+
+    <button
+        type="button"
+        class="modeButton"
+        data-mode="4"
+        aria-label="Mode 4">
+        <span class="icon-holographic"></span>
+    </button>
+
+</div>
+
+<!-- FITS Viewer Overlay -->
+<div id="fitsViewerOverlay" class="fits-viewer-overlay">
+
+    <button id="closeFitsViewer" class="fits-viewer-close">
+        ✕
+    </button>
+
+    <iframe
+        id="fitsViewerFrame"
+        title="FITS Image Viewer"
+        allowfullscreen
+    ></iframe>
+
+</div>
+
+<script src="app.js"></script>
+<script src="eoc-earth-locator.js"></script>
+<script type="importmap">
+{
+    "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js"
+    }
+}
+</script>
+<script
+    type="module"
+    src="mode4.js">
+</script>
+<script src="aiExplain.js" defer></script>
+
+</body>
+</html>
