@@ -501,107 +501,6 @@ function makeEarthOceanSurface(THREE, radius) {
 
 
 
-
-
-function makeMagneticLoops(radius, color, opacity) {
-    const group = new THREE.Group();
-    group.name = 'sunHologramMagneticField';
-
-    // Randomized magnetic bundle configuration.
-    const bundleCount = 18;
-    const strandsPerBundle = 7;
-    const segments = 96;
-
-    const positions = [];
-
-    for (let b = 0; b < bundleCount; b++) {
-
-        // Uniformly distribute bundle origins over the sphere.
-        const z = Math.random() * 2 - 1;
-        const angle = Math.random() * Math.PI * 2;
-        const radial = Math.sqrt(1 - z * z);
-
-        const normal = new THREE.Vector3(
-            radial * Math.cos(angle),
-            z,
-            radial * Math.sin(angle)
-        );
-
-        // Establish a random orientation for each bundle.
-        const randomVector = new THREE.Vector3(
-            Math.random() - 0.5,
-            Math.random() - 0.5,
-            Math.random() - 0.5
-        );
-
-        const tangent = new THREE.Vector3()
-            .crossVectors(normal, randomVector);
-
-        // Protect against a nearly parallel random vector.
-        if (tangent.lengthSq() < 0.0001) {
-            tangent.set(1, 0, 0)
-                .cross(normal);
-        }
-
-        tangent.normalize();
-
-        const bundleAxis = new THREE.Vector3()
-            .crossVectors(normal, tangent)
-            .normalize();
-
-        // Smaller randomized loops.
-        const baseSpan = 0.10 + Math.random() * 0.14;
-        const baseHeight = radius * (
-            0.15 + Math.random() * 0.25
-        );
-
-        // Fine, closely spaced filaments.
-        const strandSpacing =
-            0.006 + Math.random() * 0.004;
-
-        for (let s = 0; s < strandsPerBundle; s++) {
-
-            const strandOffset =
-                (s - (strandsPerBundle - 1) / 2) *
-                strandSpacing;
-
-            const strandNormal = normal.clone()
-                .addScaledVector(bundleAxis, strandOffset)
-                .normalize();
-
-            // Slight natural variation within each bundle.
-            const span = baseSpan +
-                (Math.random() - 0.5) * 0.015;
-
-            const height = baseHeight *
-                (0.94 + Math.random() * 0.12);
-
-            const points = [];
-
-            for (let i = 0; i <= segments; i++) {
-
-                const t = Math.PI * i / segments;
-
-                // Compact magnetic arch.
-                // Both endpoints remain on the solar surface.
-                const horizontal =
-                    radius * Math.sin(span) * Math.cos(t);
-
-                const vertical =
-                    radius * Math.cos(span) +
-                    height * Math.sin(t);
-
-                const point = strandNormal.clone()
-                    .multiplyScalar(vertical)
-                    .addScaledVector(tangent, horizontal);
-
-                points.push(point);
-            }
-
-            // Add the fine filament as line segments.
-            for (let i = 0; i < points.length - 1; i++) {
-                positions.push(
-
 function makeMagneticLoops(radius, color, opacity) {
     const group = new THREE.Group();
     group.name = 'sunHologramMagneticField';
@@ -813,8 +712,12 @@ function makeMagneticLoops(radius, color, opacity) {
     group.add(magneticLines);
 
     return group;
-}
+        }
+    
 
+
+                
+            
 
 
 
