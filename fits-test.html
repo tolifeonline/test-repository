@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Astronomical Time — Analyze FITS</title>
+  <script src="libs/fitsjs/fits.js"></script>
+  <style>
+    :root {
+      --bg: #10151C;
+      --img-bg: #05080C;
+      --text: #c8d0d8;
+      --text-dim: #8a939e;
+      --control: #2a3340;
+      --control-hover: #3a4555;
+      --border: #1e2733;
+      --accent: #FFC30E;
+      --error: #e85d5d;
+      --success: #5dce8a;
+      --panel: #151b24;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 13px;
+      line-height: 1.4;
+      overflow: hidden;
+    }
+
+    .app {
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 14px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    header .meta {
+      color: var(--text-dim);
+      font-size: 12px;
+    }
+
+    .main {
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      min-height: 0;
+    }
+	
+	canvas {
+    touch-action: none;
+	}
+
+    @media (max-width: 800px) {
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr auto;
+      }
+      .sidebar {
+        max-height: 40vh;
+        overflow-y: auto;
+      }
+    }
+
+    .viewport-wrap {
+      position: relative;
+      background: var(--img-bg);
+      min-height: 0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #fitsCanvas {
+      display: block;
+      cursor: crosshair;
+      max-width: 100%;
+      max-height: 100%;
+      background: #000;
+      image-rendering: pixelated;
+    }
+
+    .overlay-msg {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 8, 12, 0.85);
+      color: var(--text);
+      font-size: 14px;
+      padding: 20px;
+      text-align: center;
+      z-index: 5;
+    }
+
+    .overlay-msg.hidden { display: none; }
+
+    .overlay-msg .spinner {
+      width: 28px;
+      height: 28px;
+      border: 3px solid var(--control);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .sidebar {
+      background: var(--panel);
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+
+    .section:last-child { border-bottom: none; }
+
+    .section h2 {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    button, select {
+      background: var(--control);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 5px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    button:hover, select:hover { background: var(--control-hover); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary {
+      background: #2a3a1a;
+      border-color: #3d5a20;
+      color: var(--accent);
+    }
+    button.primary:hover:not(:disabled) { background: #344a22; }
+    button.active {
+      outline: 1px solid var(--accent);
+      color: var(--accent);
+    }
+
+    label.ctrl {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+      color: var(--text-dim);
+      flex: 1;
+      min-width: 90px;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    input[type="number"] {
+      background: var(--control);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 12px;
+      width: 100%;
+    }
+
+    .diag-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    .diag-table td {
+      padding: 3px 0;
+      vertical-align: top;
+    }
+
+    .diag-table td:first-child {
+      color: var(--text-dim);
+      width: 42%;
+      padding-right: 8px;
+    }
+
+    .diag-table td:last-child {
+      word-break: break-all;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .pixel-info {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      background: var(--img-bg);
+      padding: 6px 8px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+
+    .pixel-info span { color: var(--accent); }
+
+    .header-view {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10px;
+      background: var(--img-bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px;
+      max-height: 180px;
+      overflow: auto;
+      white-space: pre;
+      color: var(--text-dim);
+    }
+
+    .hdu-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .hdu-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      background: var(--control);
+      border-radius: 4px;
+      font-size: 11px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+
+    .hdu-item:hover { background: var(--control-hover); }
+    .hdu-item.selected {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .hdu-item .badge {
+      font-size: 10px;
+      background: var(--border);
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: var(--text-dim);
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 4px 14px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-dim);
+      flex-wrap: wrap;
+    }
+
+    .status-bar .ok { color: var(--success); }
+    .status-bar .err { color: var(--error); }
+
+    .error-box {
+      background: rgba(232, 93, 93, 0.12);
+      border: 1px solid var(--error);
+      color: #f0a0a0;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      white-space: pre-wrap;
+    }
+
+    .error-box.hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>FITS Analyzer</h1>
+      <span class="meta">astrojs/fitsjs · native Canvas · TESS sector 108</span>
+      <div class="controls-row" style="margin-left:auto;">
+        <button id="btnLoad" class="primary">Load Scientific Image</button>
+        <button id="btnReset" disabled>Reset View</button>
+        <button id="btnFullscreen" disabled>Fullscreen</button>
+      </div>
+    </header>
+
+    <div class="main">
+      <div class="viewport-wrap" id="viewport">
+        <canvas id="fitsCanvas" width="800" height="600"></canvas>
+        <div class="overlay-msg" id="overlay">
+          <div>
+            <div class="spinner" id="spinner" style="display:none;"></div>
+            <div id="overlayText">Click “Load Scientific Image” to start.</div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sidebar">
+        <div class="section">
+          <h2>Diagnostics</h2>
+          <table class="diag-table" id="diagTable">
+            <tr><td>Download time</td><td id="dDownload">—</td></tr>
+            <tr><td>Download size</td><td id="dSize">—</td></tr>
+            <tr><td>Parsing time</td><td id="dParse">—</td></tr>
+            <tr><td>Rendering time</td><td id="dRender">—</td></tr>
+            <tr><td>Image dimensions</td><td id="dDims">—</td></tr>
+            <tr><td>BITPIX</td><td id="dBitpix">—</td></tr>
+            <tr><td>HDU count</td><td id="dHdus">—</td></tr>
+            <tr><td>HTTP response</td><td id="dHttp">—</td></tr>
+            <tr><td>Browser</td><td id="dBrowser">—</td></tr>
+          </table>
+        </div>
+
+        <div class="section">
+          <h2>HDUs</h2>
+          <div class="hdu-list" id="hduList"></div>
+        </div>
+
+        <div class="section">
+          <h2>Stretch</h2>
+          <div class="controls-row">
+            <button data-stretch="linear" class="stretch-btn active">Linear</button>
+            <button data-stretch="log" class="stretch-btn">Log</button>
+            <button data-stretch="sqrt" class="stretch-btn">Sqrt</button>
+            <button data-stretch="zscale" class="stretch-btn">ZScale</button>
+          </div>
+          <div class="controls-row">
+            <label class="ctrl">Min <input type="number" id="vmin" step="any" /></label>
+            <label class="ctrl">Max <input type="number" id="vmax" step="any" /></label>
+          </div>
+          <div class="controls-row">
+            <label class="ctrl">Brightness <input type="range" id="brightness" min="-100" max="100" value="0" /></label>
+            <label class="ctrl">Contrast <input type="range" id="contrast" min="0" max="300" value="100" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Pixel</h2>
+          <div class="pixel-info" id="pixelInfo">
+            X: <span>—</span>  Y: <span>—</span><br />
+            Value: <span>—</span><br />
+            Display: <span>—</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Header (selected HDU)</h2>
+          <div class="header-view" id="headerView">—</div>
+        </div>
+
+        <div class="error-box hidden" id="errorBox"></div>
+      </aside>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusMsg">Ready</span>
+      <span id="statusZoom">Zoom: 100%</span>
+      <span id="statusCoords"></span>
+    </div>
+  </div>
+
+  <script>
+(function () {
+  'use strict';
+
+const params = new URLSearchParams(window.location.search);
+
+const FITS_URL = params.get('url') ||
+    'https://pub-a4e75072d2cf451c8e429d9306f166f0.r2.dev/TESS/sector-108-orbit-2b-cam1-ccd1-cadence-01335263.fits';
+
+const EXPECTED_SIZE = 17801280;
+  // --- DOM ---
+  const canvas = document.getElementById('fitsCanvas');
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const overlay = document.getElementById('overlay');
+  const overlayText = document.getElementById('overlayText');
+  const spinner = document.getElementById('spinner');
+  const errorBox = document.getElementById('errorBox');
+  const pixelInfo = document.getElementById('pixelInfo');
+  const headerView = document.getElementById('headerView');
+  const hduList = document.getElementById('hduList');
+  const statusMsg = document.getElementById('statusMsg');
+  const statusZoom = document.getElementById('statusZoom');
+
+  const dDownload = document.getElementById('dDownload');
+  const dSize = document.getElementById('dSize');
+  const dParse = document.getElementById('dParse');
+  const dRender = document.getElementById('dRender');
+  const dDims = document.getElementById('dDims');
+  const dBitpix = document.getElementById('dBitpix');
+  const dHdus = document.getElementById('dHdus');
+  const dHttp = document.getElementById('dHttp');
+  const dBrowser = document.getElementById('dBrowser');
+
+  dBrowser.textContent = navigator.userAgent.split(' ').slice(-2).join(' ') || navigator.userAgent.slice(0, 60);
+
+  // --- State ---
+  let fitsObj = null;
+  let hdusInfo = [];
+  let selectedHduIndex = -1;
+  let pixelArray = null;       // original numerical values (Float32/typed)
+  let imageWidth = 0;
+  let imageHeight = 0;
+  let dataMin = 0;
+  let dataMax = 1;
+  let stretch = 'linear';
+  let vmin = 0;
+  let vmax = 1;
+  let brightness = 0;   // -100..100
+  let contrast = 100;   // 0..300 (%)
+
+  // View transform (image space → canvas)
+  let scale = 1;
+  let offsetX = 0;
+  let offsetY = 0;
+  let isPanning = false;
+  let panStartX = 0;
+  let panStartY = 0;
+  let panOriginX = 0;
+  let panOriginY = 0;
+
+  // Display buffer (reused)
+  let imageData = null;
+  let displayCanvas = null;  // offscreen for full-res render
+  let displayCtx = null;
+
+  // --- Helpers ---
+  function setOverlay(text, loading) {
+    overlay.classList.remove('hidden');
+    overlayText.textContent = text;
+    spinner.style.display = loading ? 'block' : 'none';
+  }
+
+  function hideOverlay() {
+    overlay.classList.add('hidden');
+  }
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove('hidden');
+    statusMsg.innerHTML = '<span class="err">Error</span>';
+    console.error('[FITS Test]', msg);
+  }
+
+  function clearError() {
+    errorBox.classList.add('hidden');
+    errorBox.textContent = '';
+  }
+
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(2) + ' MB';
+  }
+
+  function formatMs(ms) {
+    if (ms < 1) return '<1 ms';
+    if (ms < 1000) return Math.round(ms) + ' ms';
+    return (ms / 1000).toFixed(2) + ' s';
+  }
+
+  // Simple IRAF-style ZScale approximation
+  function computeZScale(arr, nSample) {
+    nSample = nSample || 10000;
+    const len = arr.length;
+    const step = Math.max(1, Math.floor(len / nSample));
+    const samples = [];
+    for (let i = 0; i < len; i += step) {
+      const v = arr[i];
+      if (!isNaN(v) && isFinite(v)) samples.push(v);
+    }
+    if (samples.length < 10) return [dataMin, dataMax];
+    samples.sort(function (a, b) { return a - b; });
+    const n = samples.length;
+    const contrastZ = 0.25;
+    const mid = samples[Math.floor(n / 2)];
+    // robust range via percentiles
+    const p1 = samples[Math.floor(n * 0.01)] || samples[0];
+    const p99 = samples[Math.floor(n * 0.99)] || samples[n - 1];
+    let z1 = mid - (mid - p1) / contrastZ;
+    let z2 = mid + (p99 - mid) / contrastZ;
+    if (z1 >= z2) {
+      z1 = p1;
+      z2 = p99;
+    }
+    return [z1, z2];
+  }
+
+  function stretchValue(v, sMin, sMax, mode) {
+    if (isNaN(v) || !isFinite(v)) return 0;
+    let t;
+    if (mode === 'log') {
+      const lo = Math.max(sMin, 1e-10);
+      const hi = Math.max(sMax, lo * 1.0001);
+      const vv = Math.max(v, lo);
+      t = Math.log(vv / lo) / Math.log(hi / lo);
+    } else if (mode === 'sqrt') {
+      const lo = Math.max(sMin, 0);
+      const hi = Math.max(sMax, lo + 1e-10);
+      const vv = Math.max(v - lo, 0);
+      t = Math.sqrt(vv) / Math.sqrt(hi - lo);
+    } else {
+      // linear / zscale (range already set)
+      t = (v - sMin) / (sMax - sMin || 1e-10);
+    }
+    t = Math.max(0, Math.min(1, t));
+    // brightness / contrast on display side
+    const c = contrast / 100;
+    const b = brightness / 100;
+    t = (t - 0.5) * c + 0.5 + b * 0.5;
+    return Math.max(0, Math.min(1, t));
+  }
+
+  function renderToDisplayBuffer() {
+    if (!pixelArray || !imageWidth || !imageHeight) return;
+    const t0 = performance.now();
+
+    if (!displayCanvas) {
+      displayCanvas = document.createElement('canvas');
+      displayCtx = displayCanvas.getContext('2d', { alpha: false });
+    }
+    if (displayCanvas.width !== imageWidth || displayCanvas.height !== imageHeight) {
+      displayCanvas.width = imageWidth;
+      displayCanvas.height = imageHeight;
+      imageData = displayCtx.createImageData(imageWidth, imageHeight);
+    }
+
+    const data = imageData.data;
+    const arr = pixelArray;
+    const sMin = vmin;
+    const sMax = vmax;
+    const mode = stretch;
+    const n = imageWidth * imageHeight;
+
+    for (let i = 0; i < n; i++) {
+      const g = Math.round(stretchValue(arr[i], sMin, sMax, mode) * 255);
+      const o = i * 4;
+      data[o] = g;
+      data[o + 1] = g;
+      data[o + 2] = g;
+      data[o + 3] = 255;
+    }
+
+    displayCtx.putImageData(imageData, 0, 0);
+    const t1 = performance.now();
+    dRender.textContent = formatMs(t1 - t0);
+    drawView();
+  }
+
+  function fitToViewport() {
+    const wrap = document.getElementById('viewport');
+    const cw = wrap.clientWidth;
+    const ch = wrap.clientHeight;
+    if (!imageWidth || !imageHeight || !cw || !ch) return;
+    const sx = cw / imageWidth;
+    const sy = ch / imageHeight;
+    scale = Math.min(sx, sy) * 0.98;
+    offsetX = (cw - imageWidth * scale) / 2;
+    offsetY = (ch - imageHeight * scale) / 2;
+    statusZoom.textContent = 'Zoom: ' + Math.round(scale * 100) + '%';
+    resizeCanvas();
+    drawView();
+  }
+
+  function resizeCanvas() {
+    const wrap = document.getElementById('viewport');
+    const dpr = window.devicePixelRatio || 1;
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    canvas.width = Math.max(1, Math.floor(w * dpr));
+    canvas.height = Math.max(1, Math.floor(h * dpr));
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function drawView() {
+    if (!displayCanvas) return;
+    const wrap = document.getElementById('viewport');
+    const w = wrap.clientWidth;
+    const h = wrap.clientHeight;
+    ctx.fillStyle = '#05080C';
+    ctx.fillRect(0, 0, w, h);
+    ctx.imageSmoothingEnabled = scale < 4;
+    ctx.drawImage(
+      displayCanvas,
+      0, 0, imageWidth, imageHeight,
+      offsetX, offsetY, imageWidth * scale, imageHeight * scale
+    );
+  }
+
+  function canvasToImage(cx, cy) {
+    const x = Math.floor((cx - offsetX) / scale);
+    const y = Math.floor((cy - offsetY) / scale);
+    return { x: x, y: y };
+  }
+
+  function updatePixelInfo(cx, cy) {
+    if (!pixelArray) {
+      pixelInfo.innerHTML = 'X: <span>—</span>  Y: <span>—</span><br />Value: <span>—</span><br />Display: <span>—</span>';
+      return;
+    }
+    const p = canvasToImage(cx, cy);
+    if (p.x < 0 || p.y < 0 || p.x >= imageWidth || p.y >= imageHeight) {
+      pixelInfo.innerHTML = 'X: <span>—</span>  Y: <span>—</span><br />Value: <span>—</span><br />Display: <span>—</span>';
+      return;
+    }
+    const val = pixelArray[p.y * imageWidth + p.x];
+    const disp = stretchValue(val, vmin, vmax, stretch);
+    pixelInfo.innerHTML =
+      'X: <span>' + p.x + '</span>  Y: <span>' + p.y + '</span><br />' +
+      'Value: <span>' + (typeof val === 'number' ? val.toPrecision(6) : val) + '</span><br />' +
+      'Display: <span>' + disp.toFixed(4) + '</span>';
+  }
+
+  // --- HDU handling ---
+  function inspectHdus(fits) {
+    hdusInfo = [];
+    const list = fits.hdus || [];
+    dHdus.textContent = String(list.length);
+
+    for (let i = 0; i < list.length; i++) {
+      const hdu = list[i];
+      const hdr = hdu.header;
+      const xtension = hdr.get('XTENSION') || (hdr.isPrimary && hdr.isPrimary() ? 'PRIMARY' : 'UNKNOWN');
+      const naxis = hdr.get('NAXIS') || 0;
+      const bitpix = hdr.get('BITPIX');
+      const naxis1 = hdr.get('NAXIS1');
+      const naxis2 = hdr.get('NAXIS2');
+      const extname = hdr.get('EXTNAME') || '';
+      const hasData = hdu.hasData && hdu.hasData();
+      const isImage = (naxis >= 2) && (bitpix != null) && hasData &&
+        (xtension === 'PRIMARY' || xtension === 'IMAGE' || !hdr.get('XTENSION'));
+
+      // Also treat CompressedImage as image-capable
+      const dataType = hdr.getDataType ? hdr.getDataType() : null;
+      const isCompressed = dataType === 'CompressedImage';
+
+      hdusInfo.push({
+        index: i,
+        xtension: xtension,
+        extname: extname,
+        naxis: naxis,
+        bitpix: bitpix,
+        naxis1: naxis1,
+        naxis2: naxis2,
+        hasData: hasData,
+        isImage: isImage || isCompressed,
+        isTable: xtension === 'BINTABLE' || xtension === 'TABLE',
+        hdu: hdu
+      });
+    }
+
+    renderHduList();
+  }
+
+  function renderHduList() {
+    hduList.innerHTML = '';
+    hdusInfo.forEach(function (info) {
+      const el = document.createElement('div');
+      el.className = 'hdu-item' + (info.index === selectedHduIndex ? ' selected' : '');
+      let label = '#' + info.index + ' ' + info.xtension;
+      if (info.extname) label += ' · ' + info.extname;
+      el.innerHTML = '<span>' + label + '</span>' +
+        (info.isImage ? '<span class="badge">image</span>' : '') +
+        (info.isTable ? '<span class="badge">table</span>' : '') +
+        (info.naxis1 ? '<span class="badge">' + info.naxis1 + '×' + (info.naxis2 || 1) + '</span>' : '');
+      el.addEventListener('click', function () {
+        selectHdu(info.index);
+      });
+      hduList.appendChild(el);
+    });
+  }
+
+  function headerToText(hdr) {
+    // fitsjs Header stores cards; expose common keys
+    const keys = [
+      'SIMPLE', 'BITPIX', 'NAXIS', 'NAXIS1', 'NAXIS2', 'NAXIS3',
+      'BSCALE', 'BZERO', 'BUNIT', 'OBJECT', 'TELESCOP', 'INSTRUME',
+      'DATE-OBS', 'EXPTIME', 'FILTER', 'XTENSION', 'EXTNAME', 'EXTVER',
+      'TFIELDS', 'PCOUNT', 'GCOUNT', 'ZIMAGE', 'ZBITPIX', 'ZNAXIS',
+      'ZNAXIS1', 'ZNAXIS2', 'ZCMPTYPE', 'CHECKSUM', 'DATASUM'
+    ];
+    const lines = [];
+    keys.forEach(function (k) {
+      if (hdr.contains && hdr.contains(k)) {
+        lines.push(k.padEnd(8) + '= ' + String(hdr.get(k)));
+      }
+    });
+    // Also dump any other known from card map if available
+    if (hdr.cards) {
+      Object.keys(hdr.cards).forEach(function (k) {
+        if (keys.indexOf(k) === -1) {
+          try {
+            lines.push(k.padEnd(8) + '= ' + String(hdr.get(k)));
+          } catch (e) { /* skip */ }
+        }
+      });
+    }
+    return lines.length ? lines.join('\n') : '(no keywords extracted)';
+  }
+
+  function selectHdu(index) {
+    selectedHduIndex = index;
+    renderHduList();
+    const info = hdusInfo[index];
+    if (!info) return;
+
+    const hdr = info.hdu.header;
+    headerView.textContent = headerToText(hdr);
+    dBitpix.textContent = String(info.bitpix != null ? info.bitpix : '—');
+    dDims.textContent = info.naxis1 ? (info.naxis1 + ' × ' + (info.naxis2 || 1)) : '—';
+
+    if (!info.isImage) {
+      statusMsg.textContent = 'HDU #' + index + ' is not an image (' + info.xtension + ')';
+      pixelArray = null;
+      drawView();
+      return;
+    }
+
+    loadImageHdu(info);
+  }
+
+  function loadImageHdu(info) {
+    const dataunit = info.hdu.data;
+    if (!dataunit || typeof dataunit.getFrame !== 'function') {
+      showError('Selected HDU has no getFrame() method (unsupported data unit).');
+      return;
+    }
+
+    setOverlay('Reading image frame…', true);
+    statusMsg.textContent = 'Loading frame from HDU #' + info.index + '…';
+    clearError();
+
+    const t0 = performance.now();
+    dataunit.getFrame(0, function (arr) {
+      const t1 = performance.now();
+      dParse.textContent = (dParse.textContent && dParse.textContent !== '—')
+        ? dParse.textContent
+        : formatMs(t1 - t0);
+
+      if (!arr || !arr.length) {
+        showError('getFrame returned empty array.');
+        setOverlay('No pixel data in this HDU.', false);
+        return;
+      }
+
+      pixelArray = arr;
+      imageWidth = dataunit.width || info.naxis1;
+      imageHeight = dataunit.height || info.naxis2 || 1;
+
+      // Extent from library helper or manual
+      let extent;
+      if (typeof dataunit.getExtent === 'function') {
+        extent = dataunit.getExtent(arr);
+      } else {
+        let mn = Infinity, mx = -Infinity;
+        for (let i = 0; i < arr.length; i++) {
+          const v = arr[i];
+          if (!isNaN(v) && isFinite(v)) {
+            if (v < mn) mn = v;
+            if (v > mx) mx = v;
+          }
+        }
+        extent = [mn, mx];
+      }
+      dataMin = extent[0];
+      dataMax = extent[1];
+      if (!isFinite(dataMin) || !isFinite(dataMax) || dataMin === dataMax) {
+        dataMin = 0;
+        dataMax = 1;
+      }
+
+      dDims.textContent = imageWidth + ' × ' + imageHeight;
+      dBitpix.textContent = String(dataunit.bitpix != null ? dataunit.bitpix : info.bitpix);
+
+      // Apply default stretch range
+      if (stretch === 'zscale') {
+        const z = computeZScale(arr);
+        vmin = z[0];
+        vmax = z[1];
+      } else {
+        vmin = dataMin;
+        vmax = dataMax;
+      }
+      document.getElementById('vmin').value = vmin;
+      document.getElementById('vmax').value = vmax;
+
+      document.getElementById('btnReset').disabled = false;
+      document.getElementById('btnFullscreen').disabled = false;
+
+      hideOverlay();
+      statusMsg.innerHTML = '<span class="ok">Image loaded</span> · HDU #' + info.index +
+        ' · ' + imageWidth + '×' + imageHeight + ' · ' + arr.constructor.name;
+
+      renderToDisplayBuffer();
+      fitToViewport();
+
+      console.log('[FITS Test] Frame loaded', {
+        width: imageWidth,
+        height: imageHeight,
+        length: arr.length,
+        type: arr.constructor.name,
+        min: dataMin,
+        max: dataMax,
+        sample: [arr[0], arr[Math.floor(arr.length / 2)], arr[arr.length - 1]]
+      });
+    });
+  }
+
+  // --- Load pipeline ---
+  async function loadFits() {
+    clearError();
+    document.getElementById('btnLoad').disabled = true;
+    setOverlay('Fetching FITS from R2…', true);
+    statusMsg.textContent = 'Downloading…';
+
+    dDownload.textContent = '…';
+    dSize.textContent = '…';
+    dParse.textContent = '…';
+    dRender.textContent = '—';
+    dHttp.textContent = '…';
+    dHdus.textContent = '—';
+    dDims.textContent = '—';
+    dBitpix.textContent = '—';
+
+    const tDownload0 = performance.now();
+    let response;
+    let buffer;
+
+    try {
+      response = await fetch(FITS_URL, { mode: 'cors', credentials: 'omit' });
+      dHttp.textContent = response.status + ' ' + response.statusText;
+
+      if (!response.ok) {
+        throw new Error('HTTP ' + response.status + ' ' + response.statusText);
+      }
+
+      buffer = await response.arrayBuffer();
+    } catch (err) {
+      const msg = String(err && err.message ? err.message : err);
+      let kind = 'Network / fetch failure';
+      if (/cors|cross-origin|access-control/i.test(msg) || err.name === 'TypeError') {
+        kind = 'CORS or network restriction';
+      }
+      showError(kind + ':\n' + msg + '\n\nURL: ' + FITS_URL);
+      setOverlay('Failed to download FITS file.', false);
+      document.getElementById('btnLoad').disabled = false;
+      dHttp.textContent = 'failed';
+      return;
+    }
+
+    const tDownload1 = performance.now();
+    const downloadMs = tDownload1 - tDownload0;
+    const byteLength = buffer.byteLength;
+
+    dDownload.textContent = formatMs(downloadMs);
+    dSize.textContent = formatBytes(byteLength) +
+      (byteLength === EXPECTED_SIZE ? ' (matches expected)' : ' (expected ' + formatBytes(EXPECTED_SIZE) + ')');
+
+    // Validate FITS signature
+    const sig = new Uint8Array(buffer, 0, 8);
+    const sigStr = String.fromCharCode.apply(null, sig);
+    if (sigStr.indexOf('SIMPLE') !== 0) {
+      showError('Invalid FITS signature. Expected "SIMPLE" at start, got: "' +
+        sigStr.replace(/[^\x20-\x7E]/g, '.') + '"');
+      setOverlay('Not a valid FITS file.', false);
+      document.getElementById('btnLoad').disabled = false;
+      return;
+    }
+
+    console.log('[FITS Test] Download OK', {
+      bytes: byteLength,
+      ms: Math.round(downloadMs),
+      signature: sigStr.trim()
+    });
+
+    setOverlay('Parsing FITS with fitsjs…', true);
+    statusMsg.textContent = 'Parsing…';
+
+    // Pass as Blob so fitsjs Parser uses FileReader path
+    const blob = new Blob([buffer], { type: 'application/fits' });
+
+    const tParse0 = performance.now();
+
+    try {
+      if (typeof astro === 'undefined' || !astro.FITS) {
+        throw new Error('astro.FITS not found — fits.js failed to load');
+      }
+
+      fitsObj = new astro.FITS(blob, function (fits) {
+        const tParse1 = performance.now();
+        dParse.textContent = formatMs(tParse1 - tParse0);
+
+        if (!fits || !fits.hdus || !fits.hdus.length) {
+          showError('fitsjs parsed the file but found no HDUs.');
+          setOverlay('No HDUs detected.', false);
+          document.getElementById('btnLoad').disabled = false;
+          return;
+        }
+
+        console.log('[FITS Test] Parsed', {
+          hduCount: fits.hdus.length,
+          version: astro.FITS.version
+        });
+
+        inspectHdus(fits);
+
+        // Prefer first image HDU
+        let imgIdx = hdusInfo.findIndex(function (h) { return h.isImage; });
+        if (imgIdx < 0) imgIdx = 0;
+        selectHdu(imgIdx);
+
+        document.getElementById('btnLoad').disabled = false;
+        statusMsg.innerHTML = '<span class="ok">Parse complete</span> · ' + fits.hdus.length + ' HDU(s)';
+      });
+    } catch (err) {
+      showError('FITS parsing failure:\n' + (err && err.message ? err.message : err));
+      setOverlay('Parse failed.', false);
+      document.getElementById('btnLoad').disabled = false;
+      console.error(err);
+    }
+  }
+
+  // --- Events ---
+  document.getElementById('btnLoad').addEventListener('click', loadFits);
+
+  document.getElementById('btnReset').addEventListener('click', function () {
+    fitToViewport();
+  });
+
+  document.getElementById('btnFullscreen').addEventListener('click', function () {
+    const el = document.getElementById('viewport');
+    if (!document.fullscreenElement) {
+      el.requestFullscreen().catch(function () {});
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
+  document.querySelectorAll('.stretch-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.stretch-btn').forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      stretch = btn.getAttribute('data-stretch');
+      if (stretch === 'zscale' && pixelArray) {
+        const z = computeZScale(pixelArray);
+        vmin = z[0];
+        vmax = z[1];
+        document.getElementById('vmin').value = vmin;
+        document.getElementById('vmax').value = vmax;
+      } else if (pixelArray) {
+        vmin = dataMin;
+        vmax = dataMax;
+        document.getElementById('vmin').value = vmin;
+        document.getElementById('vmax').value = vmax;
+      }
+      renderToDisplayBuffer();
+    });
+  });
+
+  document.getElementById('vmin').addEventListener('change', function (e) {
+    vmin = parseFloat(e.target.value);
+    if (!isNaN(vmin)) renderToDisplayBuffer();
+  });
+  document.getElementById('vmax').addEventListener('change', function (e) {
+    vmax = parseFloat(e.target.value);
+    if (!isNaN(vmax)) renderToDisplayBuffer();
+  });
+  document.getElementById('brightness').addEventListener('input', function (e) {
+    brightness = parseInt(e.target.value, 10);
+    renderToDisplayBuffer();
+  });
+  document.getElementById('contrast').addEventListener('input', function (e) {
+    contrast = parseInt(e.target.value, 10);
+    renderToDisplayBuffer();
+  });
+
+
+  // Pan
+  canvas.addEventListener('mousedown', function (e) {
+    if (e.button !== 0) return;
+
+    isPanning = true;
+    panStartX = e.clientX;
+    panStartY = e.clientY;
+    panOriginX = offsetX;
+    panOriginY = offsetY;
+    canvas.style.cursor = 'grabbing';
+  });
+
+  window.addEventListener('mouseup', function () {
+    isPanning = false;
+    canvas.style.cursor = 'crosshair';
+  });
+
+  window.addEventListener('mousemove', function (e) {
+    if (isPanning) {
+      offsetX = panOriginX + (e.clientX - panStartX);
+      offsetY = panOriginY + (e.clientY - panStartY);
+      drawView();
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    updatePixelInfo(cx, cy);
+  });
+
+  // Desktop wheel zoom (toward cursor)
+  canvas.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    if (!pixelArray) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+
+    const factor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+    const newScale = Math.max(0.05, Math.min(64, scale * factor));
+
+    offsetX = cx - (cx - offsetX) * (newScale / scale);
+    offsetY = cy - (cy - offsetY) * (newScale / scale);
+
+    scale = newScale;
+    statusZoom.textContent = 'Zoom: ' + Math.round(scale * 100) + '%';
+    drawView();
+  }, { passive: false });
+
+  // Mobile touch gestures
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchOriginX = 0;
+  let touchOriginY = 0;
+  let initialPinchDistance = 0;
+  let initialPinchScale = 1;
+
+  function getTouchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function getTouchCenter(touches, rect) {
+    return {
+      x: (touches[0].clientX + touches[1].clientX) / 2 - rect.left,
+      y: (touches[0].clientY + touches[1].clientY) / 2 - rect.top
+    };
+  }
+
+  canvas.addEventListener('touchstart', function (e) {
+    e.preventDefault();
+
+    if (e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchOriginX = offsetX;
+      touchOriginY = offsetY;
+    } else if (e.touches.length === 2) {
+      initialPinchDistance = getTouchDistance(e.touches);
+      initialPinchScale = scale;
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', function (e) {
+    e.preventDefault();
+    if (!pixelArray) return;
+
+    const rect = canvas.getBoundingClientRect();
+
+    // One finger: pan
+    if (e.touches.length === 1) {
+      offsetX = touchOriginX + (e.touches[0].clientX - touchStartX);
+      offsetY = touchOriginY + (e.touches[0].clientY - touchStartY);
+      drawView();
+    }
+
+    // Two fingers: pinch zoom
+    else if (e.touches.length === 2) {
+      const distance = getTouchDistance(e.touches);
+      const center = getTouchCenter(e.touches, rect);
+
+      if (initialPinchDistance > 0) {
+        const newScale = Math.max(
+          0.05,
+          Math.min(64, initialPinchScale * distance / initialPinchDistance)
+        );
+
+        offsetX = center.x - (center.x - offsetX) * (newScale / scale);
+        offsetY = center.y - (center.y - offsetY) * (newScale / scale);
+
+        scale = newScale;
+
+        statusZoom.textContent =
+          'Zoom: ' + Math.round(scale * 100) + '%';
+
+        drawView();
+      }
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', function (e) {
+    if (e.touches.length === 1) {
+      // Continue panning smoothly if one finger remains
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchOriginX = offsetX;
+      touchOriginY = offsetY;
+    } else {
+      initialPinchDistance = 0;
+    }
+  });
+
+  canvas.addEventListener('touchcancel', function () {
+    initialPinchDistance = 0;
+  });
+
+
+  window.addEventListener('resize', function () {
+    resizeCanvas();
+    drawView();
+  });
+
+  document.addEventListener('fullscreenchange', function () {
+    setTimeout(function () {
+      resizeCanvas();
+      drawView();
+    }, 100);
+  });
+
+  // Initial canvas size
+  resizeCanvas();
+  console.log('[FITS Test] Ready. fitsjs version:', (typeof astro !== 'undefined' && astro.FITS && astro.FITS.version) || 'not loaded');
+})();
+  </script>
+</body>
+</html>
