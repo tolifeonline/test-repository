@@ -601,6 +601,179 @@ function makeMagneticLoops(radius, color, opacity) {
             // Add the fine filament as line segments.
             for (let i = 0; i < points.length - 1; i++) {
                 positions.push(
+
+function makeMagneticLoops(radius, color, opacity) {
+    const group = new THREE.Group();
+    group.name = 'sunHologramMagneticField';
+
+    const bundleCount = 18;
+    const segments = 72;
+    const surfaceRadius = radius * 1.016;
+
+    const positions = [];
+
+    const random = (min, max) =>
+        min + Math.random() * (max - min);
+
+    for (let b = 0; b < bundleCount; b++) {
+
+        // Uniform random distribution over the solar sphere.
+        const z = random(-1, 1);
+        const angle = random(0, Math.PI * 2);
+        const radial = Math.sqrt(1 - z * z);
+
+        const normal = new THREE.Vector3(
+            radial * Math.cos(angle),
+            z,
+            radial * Math.sin(angle)
+        );
+
+        const randomVector = new THREE.Vector3(
+            random(-1, 1),
+            random(-1, 1),
+            random(-1, 1)
+        );
+
+        const tangent = new THREE.Vector3()
+            .crossVectors(normal, randomVector);
+
+        if (tangent.lengthSq() < 0.0001) {
+            tangent.set(1, 0, 0).cross(normal);
+        }
+
+        tangent.normalize();
+
+        const bundleAxis = new THREE.Vector3()
+            .crossVectors(normal, tangent)
+            .normalize();
+
+        // Different bundles have different sizes and structures.
+        const strandCount = Math.floor(random(4, 11));
+
+        const halfSpan = random(0.07, 0.19);
+
+        // Mostly compact loops, with occasional larger arches.
+        const height = Math.random() < 0.15
+            ? radius * random(0.36, 0.50)
+            : radius * random(0.12, 0.34);
+
+        const bundleWidth = random(0.012, 0.035);
+
+        for (let s = 0; s < strandCount; s++) {
+
+            // Irregular individual footpoint positions.
+            const startOffset = random(
+                -bundleWidth, bundleWidth
+            );
+
+            const endOffset = random(
+                -bundleWidth, bundleWidth
+            );
+
+            const individualSpan =
+                halfSpan + random(-0.025, 0.025);
+
+            const startDirection = normal.clone()
+                .addScaledVector(
+                    tangent,
+                    Math.tan(individualSpan)
+                )
+                .addScaledVector(bundleAxis, startOffset)
+                .normalize();
+
+            const endDirection = normal.clone()
+                .addScaledVector(
+                    tangent,
+                    -Math.tan(individualSpan)
+                )
+                .addScaledVector(bundleAxis, endOffset)
+                .normalize();
+
+            const p0 = startDirection
+                .multiplyScalar(surfaceRadius);
+
+            const p3 = endDirection
+                .multiplyScalar(surfaceRadius);
+
+            // Individual apex direction.
+            const apexDirection = p0.clone()
+                .add(p3)
+                .normalize();
+
+            // Slightly different curvature for every strand.
+            const individualHeight = height *
+                random(0.72, 1.30);
+
+            const asymmetry = random(-0.055, 0.055) * radius;
+
+            const side = bundleAxis.clone()
+                .addScaledVector(
+                    apexDirection,
+                    -bundleAxis.dot(apexDirection)
+                )
+                .normalize();
+
+            const p1 = p0.clone()
+                .addScaledVector(
+                    apexDirection,
+                    individualHeight * random(0.65, 1.0)
+                )
+                .addScaledVector(side, asymmetry);
+
+            const p2 = p3.clone()
+                .addScaledVector(
+                    apexDirection,
+                    individualHeight * random(0.65, 1.0)
+                )
+                .addScaledVector(side, -asymmetry);
+
+            // Each filament receives its own gentle irregularity.
+            const wobble = random(0.002, 0.012) * radius;
+            const wobbleFrequency = random(0.8, 1.8);
+            const wobblePhase = random(0, Math.PI * 2);
+
+            const points = [];
+
+            for (let i = 0; i <= segments; i++) {
+
+                const t = i / segments;
+                const u = 1 - t;
+
+                // Cubic Bézier interpolation.
+                const point = p0.clone()
+                    .multiplyScalar(u * u * u)
+                    .add(
+                        p1.clone().multiplyScalar(
+                            3 * u * u * t
+                        )
+                    )
+                    .add(
+                        p2.clone().multiplyScalar(
+                            3 * u * t * t
+                        )
+                    )
+                    .add(
+                        p3.clone().multiplyScalar(
+                            t * t * t
+                        )
+                    );
+
+                // Subtle curvature variation along the filament.
+                const wave = Math.sin(
+                    t * Math.PI * wobbleFrequency +
+                    wobblePhase
+                ) * Math.sin(Math.PI * t);
+
+                point.addScaledVector(
+                    side,
+                    wobble * wave
+                );
+
+                points.push(point);
+            }
+
+            for (let i = 0; i < points.length - 1; i++) {
+                positions.push(
                     points[i].x,
                     points[i].y,
                     points[i].z,
@@ -613,7 +786,6 @@ function makeMagneticLoops(radius, color, opacity) {
         }
     }
 
-    // One shared geometry for all magnetic filaments.
     const geometry = new THREE.BufferGeometry();
 
     geometry.setAttribute(
@@ -642,6 +814,7 @@ function makeMagneticLoops(radius, color, opacity) {
 
     return group;
 }
+
 
 
 
