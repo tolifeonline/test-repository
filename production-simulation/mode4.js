@@ -6,6 +6,8 @@
 
 import * as THREE from
     'https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js';
+
+import { createHologram } from '../hologram.js';
 	
 	
 let mode4Running = true;
@@ -36,20 +38,24 @@ function updateFocusControls() {
 	const sunInfo =
     document.getElementById('mode4SunInfo');
 	
-    if (backToOrbitButton) {
-        backToOrbitButton.style.display =
-            (earthFocused || sunFocused) ? 'block' : 'none';
-    }
+if (backToOrbitButton) {
+    backToOrbitButton.style.display =
+        !holographicMode && (earthFocused || sunFocused)
+            ? 'block'
+            : 'none';
+}
 	
 	if(sunInfo) {
     sunInfo.style.display =
         sunFocused ? 'block' : 'none';
 	}
 
-	if (focusEarthButton) {
+if (focusEarthButton) {
     focusEarthButton.style.display =
-        (!earthFocused && !sunFocused) ? 'block' : 'none';
-	}
+        !holographicMode && !earthFocused && !sunFocused
+            ? 'block'
+            : 'none';
+}
 }
 
 backToOrbitButton?.addEventListener(
@@ -611,12 +617,13 @@ function showTapIndicator(hit) {
    Solar System group
    ------------------------------------------ */
 
-const solarSystem =
-    new THREE.Group();
+const orbitalView = new THREE.Group();
+orbitalView.name = 'mode4OrbitalView';
 
-scene.add(
-    solarSystem
-);
+scene.add(orbitalView);
+
+const solarSystem = new THREE.Group();
+orbitalView.add(solarSystem);
 
 
 /* ------------------------------------------
@@ -1073,7 +1080,7 @@ const earth =
         earthGeometry,
         earthMaterial
     );
-	
+
 // Align the NASA texture so the
 // Prime Meridian becomes our reference.
 
@@ -1089,7 +1096,15 @@ solarSystem.add(
     earth
 );
 
+// Holographic presentation — reuse existing Sun and Earth.
+const hologram = createHologram(THREE);
 
+hologram.attachSun(sun);
+hologram.attachEarth(earth);
+
+hologram.setEnabled(false);
+
+let holographicMode = false;
 
 const uv = earthGeometry.attributes.uv;
 const position = earthGeometry.attributes.position;
@@ -1292,6 +1307,93 @@ document.getElementById('earthCameraReset')
 
 earthCameraControls.style.display = 'none';
 
+const presentationToggle = document.createElement('div');
+
+Object.assign(presentationToggle.style, {
+    position: 'absolute',
+    top: '16px',
+    right: '16px',
+    zIndex: '30',
+    display: 'flex',
+    gap: '3px',
+    padding: '3px',
+    background: 'rgba(2, 5, 10, 0.85)',
+    border: '1px solid rgba(120, 145, 165, 0.35)',
+    borderRadius: '6px',
+    fontFamily: 'Arial, sans-serif'
+});
+
+function makePresentationButton(label) {
+    const button = document.createElement('button');
+
+    button.type = 'button';
+    button.textContent = label;
+
+    Object.assign(button.style, {
+        padding: '7px 11px',
+        border: '0',
+        borderRadius: '4px',
+        background: 'transparent',
+        color: '#aab6c2',
+        fontSize: '10px',
+        cursor: 'pointer'
+    });
+
+    presentationToggle.appendChild(button);
+    return button;
+}
+
+const normalButton = makePresentationButton('NORMAL');
+const holographicButton = makePresentationButton('HOLOGRAPHIC');
+
+function setPresentation(mode) {
+    const enabled = mode === 'holographic';
+
+    if (enabled && (earthFocused || sunFocused)) {
+        returnToOrbit();
+    }
+
+    holographicMode = enabled;
+    hologram.setEnabled(enabled);
+
+    normalButton.style.background =
+        enabled ? 'transparent' : 'rgba(120, 145, 165, 0.2)';
+
+    normalButton.style.color =
+        enabled ? '#aab6c2' : '#ffffff';
+
+    holographicButton.style.background =
+        enabled ? 'rgba(35, 160, 200, 0.25)' : 'transparent';
+
+    holographicButton.style.color =
+        enabled ? '#65dfff' : '#aab6c2';
+
+    updateFocusControls();
+
+    focusEarthButton.style.display =
+        enabled ? 'none' : 'block';
+
+    earthCameraControls.style.display = 'none';
+    locationHUD.style.display = 'none';
+    satellitePreview.style.display = 'none';
+    solarViewUI.style.display = 'none';
+
+    hideTapIndicator();
+}
+
+normalButton.addEventListener(
+    'click',
+    () => setPresentation('normal')
+);
+
+holographicButton.addEventListener(
+    'click',
+    () => setPresentation('holographic')
+);
+
+container.appendChild(presentationToggle);
+
+setPresentation('normal');
 
 /* ------------------------------------------
    Earth focus and geographic picking
@@ -1564,35 +1666,37 @@ console.info('Earth local axes:', {
 renderer.domElement.style.touchAction = 'none';
 
 
-renderer.domElement.addEventListener(
-    'pointerdown',
-    (event) => {
-        pointerStartX = previousPointerX = event.clientX;
-        pointerStartY = previousPointerY = event.clientY;
-        dragged = false;
+let orbitalDrag = false;
 
-        const hit = getPointerIntersection(event);
-
-        if (!earthFocused && !sunFocused && hit) {
-            if (hit.object === sun) {
-                focusSun();
-            } else {
-                focusEarth();
-            }
-            return;
-        }
-
+renderer.domElement.addEventListener('pointerdown', event => {
+    if (earthFocused || sunFocused) {
         if (earthFocused) {
             dragActive = true;
+            dragged = false;
+
+            pointerStartX = previousPointerX = event.clientX;
+            pointerStartY = previousPointerY = event.clientY;
+
             renderer.domElement.setPointerCapture(event.pointerId);
-            renderer.domElement.style.cursor = 'crosshair';
         }
+
+        return;
     }
-);
+
+    dragActive = true;
+    orbitalDrag = true;
+    dragged = false;
+
+    pointerStartX = previousPointerX = event.clientX;
+    pointerStartY = previousPointerY = event.clientY;
+
+    renderer.domElement.setPointerCapture(event.pointerId);
+    renderer.domElement.style.cursor = 'grab';
+});
 
 
-renderer.domElement.addEventListener('pointermove', (event) => {
-    if (!dragActive || !earthFocused) return;
+renderer.domElement.addEventListener('pointermove', event => {
+    if (!dragActive) return;
 
     const dx = event.clientX - previousPointerX;
     const dy = event.clientY - previousPointerY;
@@ -1607,7 +1711,15 @@ renderer.domElement.addEventListener('pointermove', (event) => {
     previousPointerX = event.clientX;
     previousPointerY = event.clientY;
 
-    // Manual Earth rotation disabled for now.
+    if (orbitalDrag && dragged) {
+        orbitalView.rotation.y += dx * 0.005;
+
+        orbitalView.rotation.x = THREE.MathUtils.clamp(
+            orbitalView.rotation.x + dy * 0.005,
+            -1.1,
+            1.1
+        );
+    }
 });
 
 function hideTapIndicator() {
@@ -1630,18 +1742,57 @@ function finishEarthPointer(event) {
     }
 }
 
-renderer.domElement.addEventListener(
-    'pointerup',
-    finishEarthPointer
-);
+renderer.domElement.addEventListener('pointerup', event => {
+    if (!dragActive) return;
 
-renderer.domElement.addEventListener(
-    'pointercancel',
-    (event) => {
-        dragActive = false;
-        dragged = false;
+    dragActive = false;
+
+    if (renderer.domElement.hasPointerCapture(event.pointerId)) {
+        renderer.domElement.releasePointerCapture(event.pointerId);
     }
-);
+
+    if (orbitalDrag) {
+        orbitalDrag = false;
+        renderer.domElement.style.cursor = 'default';
+
+        if (!dragged) {
+            const hit = getPointerIntersection(event);
+
+            if (hit) {
+                if (holographicMode) {
+                    showTapIndicator(hit);
+
+                    container.dispatchEvent(
+                        new CustomEvent('mode4:holographic-select', {
+                            detail: {
+                                body: hit.object === earth ? 'earth' : 'sun',
+                                point: hit.point.clone()
+                            }
+                        })
+                    );
+                } else if (hit.object === sun) {
+                    focusSun();
+                } else {
+                    focusEarth();
+                }
+            }
+        }
+
+        return;
+    }
+
+    renderer.domElement.style.cursor = 'crosshair';
+
+    if (!dragged && earthFocused) {
+        selectEarthLocation(event);
+    }
+});
+
+renderer.domElement.addEventListener('pointercancel', () => {
+    dragActive = false;
+    orbitalDrag = false;
+    dragged = false;
+});
 
 window.addEventListener(
     'keydown',
